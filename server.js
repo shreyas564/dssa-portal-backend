@@ -49,11 +49,11 @@ const express = require('express');
   app.post('/store-marks', async (req, res) => {
     const { email, courseName, score } = req.body;
     if (!email || !courseName || score == null) {
-      return res.status(400).send('Missing required fields');
+      return res.status(400).json({ error: 'Missing required fields' });
     }
     const mark = new Marks({ email, courseName, score, timestamp: new Date() });
     await mark.save();
-    res.send('Mark stored successfully');
+    res.json({ message: 'Mark stored successfully' });
   });
 
   app.get('/fetch-marks', async (req, res) => {
