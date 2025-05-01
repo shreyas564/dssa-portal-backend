@@ -10,8 +10,9 @@ const mongoose = require('mongoose');
   });
 
   const marksSchema = new mongoose.Schema({
+    name: { type: String, required: true }, // Added name field
     email: { type: String, required: true },
-    courseName: { type: String, required: true },
+    courseName: { type: String }, // Not required since old schema didn't have it
     score: { type: Number, required: true },
     timestamp: { type: Date, default: Date.now },
   });
