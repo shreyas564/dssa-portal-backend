@@ -17,35 +17,33 @@ const express = require('express');
     .catch(err => console.error('MongoDB connection error:', err));
 
   // API endpoint to store marks (aligned with /store-data)
-  app.post('/store-marks', async (req, res) => {
-    const { name, email, score } = req.body;
+ app.post('/store-marks', async (req, res) => {
+  const { name, email, score, courseName } = req.body; // Added courseName
 
-    if (!name || !email || score == null) {
-      return res.status(400).json({ error: 'Name, email, and score are required' });
+  if (!name || !email || score == null) {
+    return res.status(400).json({ error: 'Name, email, and score are required' });
+  }
+
+  try {
+    let mark = await Marks.findOne({ email });
+
+    if (mark) {
+      mark.name = name;
+      mark.score = score;
+      mark.courseName = courseName; // Update courseName
+      mark.timestamp = new Date();
+      await mark.save();
+      res.status(200).json({ message: 'Mark data updated successfully' });
+    } else {
+      mark = new Marks({ name, email, score, courseName, timestamp: new Date() }); // Include courseName
+      await mark.save();
+      res.status(201).json({ message: 'Mark data stored successfully' });
     }
-
-    try {
-      // Check if a mark entry exists for this email and course
-      let mark = await Marks.findOne({ email });
-
-      if (mark) {
-        // Update existing mark
-        mark.name = name;
-        mark.score = score;
-        mark.timestamp = new Date();
-        await mark.save();
-        res.status(200).json({ message: 'Mark data updated successfully' });
-      } else {
-        // Create new mark
-        mark = new Marks({ name, email, score, timestamp: new Date() });
-        await mark.save();
-        res.status(201).json({ message: 'Mark data stored successfully' });
-      }
-    } catch (error) {
-      console.error('Error storing data:', error);
-      res.status(500).json({ error: 'Failed to store data' });
-    }
-  });
+  } catch (error) {
+    console.error('Error storing data:', error);
+    res.status(500).json({ error: 'Failed to store data' });
+  }
+});
 
   app.post('/register', async (req, res) => {
     const { email, password, role, name } = req.body;
