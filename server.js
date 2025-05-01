@@ -7,7 +7,16 @@ const express = require('express');
 
   const app = express();
   app.use(express.json());
-  app.use(cors());
+
+  // Configure CORS to allow all origins (for development; tighten in production)
+  app.use(cors({
+    origin: '*', // Allows all origins, including chrome-extension://...
+    methods: ['GET', 'POST', 'OPTIONS'], // Explicitly allow OPTIONS for preflight
+    allowedHeaders: ['Content-Type', 'Authorization'],
+  }));
+
+  // Handle preflight requests
+  app.options('/store-marks', cors()); // Enable CORS for OPTIONS requests
 
   mongoose.connect('mongodb+srv://npteluser:EZ4GQTlrLDQfFyW2@cluster0.oiegs.mongodb.net/dssa_portal?retryWrites=true&w=majority&appName=Cluster0');
 
@@ -49,11 +58,11 @@ const express = require('express');
   app.post('/store-marks', async (req, res) => {
     const { email, courseName, score } = req.body;
     if (!email || !courseName || score == null) {
-      return res.status(400).json({ error: 'Missing required fields' });
+      return res.status(400).send('Missing required fields');
     }
     const mark = new Marks({ email, courseName, score, timestamp: new Date() });
     await mark.save();
-    res.json({ message: 'Mark stored successfully' });
+    res.send('Mark stored successfully');
   });
 
   app.get('/fetch-marks', async (req, res) => {
