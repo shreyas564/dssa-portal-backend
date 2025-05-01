@@ -9,13 +9,13 @@ const mongoose = require('mongoose');
     otpExpires: Date,
   });
 
-  const marksSchema = new mongoose.Schema({
-    name: { type: String, required: true }, // Added name field
-    email: { type: String, required: true },
-    courseName: { type: String }, // Not required since old schema didn't have it
-    score: { type: Number, required: true },
-    timestamp: { type: Date, default: Date.now },
-  });
+const marksSchema = new mongoose.Schema({
+  name: { type: String, required: true },
+  email: { type: String, required: true },
+  courseName: { type: String },
+  score: { type: Number, required: true },
+  timestamp: { type: Date, default: Date.now },
+});
 
   module.exports = {
     User: mongoose.model('User', userSchema),
