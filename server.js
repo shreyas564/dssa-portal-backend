@@ -310,7 +310,7 @@ app.get('/fetch-marks', async (req, res) => {
   }
 });
 
-// Fetch all students with marks (for Faculty)
+// Fetch all students with marks (for Faculty, legacy endpoint)
 app.get('/fetch-all-students', async (req, res) => {
   const authHeader = req.headers.authorization;
   console.log('Received /fetch-all-students request');
@@ -365,6 +365,145 @@ app.get('/fetch-all-marks', async (req, res) => {
     res.json(marks);
   } catch (error) {
     console.error('Error in /fetch-all-marks:', error.message);
+    res.status(401).json({ error: 'Invalid token' });
+  }
+});
+
+// Faculty: Fetch unique years of study
+app.get('/faculty/years', async (req, res) => {
+  const authHeader = req.headers.authorization;
+  console.log('Received /faculty/years request');
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    console.error('Missing or invalid authorization header for /faculty/years');
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  const token = authHeader.split(' ')[1];
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    if (decoded.role !== 'Faculty') {
+      console.log('Unauthorized role for /faculty/years:', decoded.role);
+      return res.status(403).json({ error: 'Unauthorized role' });
+    }
+
+    const years = await usersCollection.distinct('yearOfStudy', { role: 'Student' });
+    console.log('Years fetched for Faculty:', years);
+    res.json(years);
+  } catch (error) {
+    console.error('Error in /faculty/years:', error.message);
+    res.status(401).json({ error: 'Invalid token' });
+  }
+});
+
+// Faculty: Fetch unique divisions for a given year
+app.get('/faculty/divisions', async (req, res) => {
+  const authHeader = req.headers.authorization;
+  const { year } = req.query;
+  console.log('Received /faculty/divisions request:', { year });
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    console.error('Missing or invalid authorization header for /faculty/divisions');
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  if (!year) {
+    console.error('Missing year parameter');
+    return res.status(400).json({ error: 'Year parameter required' });
+  }
+
+  const token = authHeader.split(' ')[1];
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    if (decoded.role !== 'Faculty') {
+      console.log('Unauthorized role for /faculty/divisions:', decoded.role);
+      return res.status(403).json({ error: 'Unauthorized role' });
+    }
+
+    const divisions = await usersCollection.distinct('division', { role: 'Student', yearOfStudy: year });
+    console.log('Divisions fetched for Faculty:', divisions);
+    res.json(divisions);
+  } catch (error) {
+    console.error('Error in /faculty/divisions:', error.message);
+    res.status(401).json({ error: 'Invalid token' });
+  }
+});
+
+// Faculty: Fetch roll numbers for a given year and division
+app.get('/faculty/roll-nos', async (req, res) => {
+  const authHeader = req.headers.authorization;
+  const { year, division } = req.query;
+  console.log('Received /faculty/roll-nos request:', { year, division });
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    console.error('Missing or invalid authorization header for /faculty/roll-nos');
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  if (!year || !division) {
+    console.error('Missing year or division parameter');
+    return res.status(400).json({ error: 'Year and division parameters required' });
+  }
+
+  const token = authHeader.split(' ')[1];
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    if (decoded.role !== 'Faculty') {
+      console.log('Unauthorized role for /faculty/roll-nos:', decoded.role);
+      return res.status(403).json({ error: 'Unauthorized role' });
+    }
+
+    const students = await usersCollection.find({ role: 'Student', yearOfStudy: year, division }).toArray();
+    const rollNos = students.map(student => ({
+      rollNo: student.rollNo,
+      email: student.email, // Include email to fetch marks later
+    }));
+    console.log('Roll numbers fetched for Faculty:', rollNos);
+    res.json(rollNos);
+  } catch (error) {
+    console.error('Error in /faculty/roll-nos:', error.message);
+    res.status(401).json({ error: 'Invalid token' });
+  }
+});
+
+// Faculty: Fetch marks for a specific student
+app.get('/faculty/student-marks', async (req, res) => {
+  const authHeader = req.headers.authorization;
+  const { email } = req.query;
+  console.log('Received /faculty/student-marks request:', { email });
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    console.error('Missing or invalid authorization header for /faculty/student-marks');
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  if (!email) {
+    console.error('Missing email parameter');
+    return res.status(400).json({ error: 'Email parameter required' });
+  }
+
+  const token = authHeader.split(' ')[1];
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    if (decoded.role !== 'Faculty') {
+      console.log('Unauthorized role for /faculty/student-marks:', decoded.role);
+      return res.status(403).json({ error: 'Unauthorized role' });
+    }
+
+    const student = await usersCollection.findOne({ email, role: 'Student' });
+    if (!student) {
+      console.log('Student not found for /faculty/student-marks:', email);
+      return res.status(404).json({ error: 'Student not found' });
+    }
+
+    const marks = await marksCollection.find({ email }).toArray();
+    const studentData = {
+      enrollmentId: student.enrollmentId,
+      rollNo: student.rollNo,
+      fullName: student.fullName,
+      yearOfStudy: student.yearOfStudy,
+      division: student.division,
+      email: student.email,
+      marks,
+    };
+
+    console.log('Student marks fetched for Faculty:', email);
+    res.json(studentData);
+  } catch (error) {
+    console.error('Error in /faculty/student-marks:', error.message);
     res.status(401).json({ error: 'Invalid token' });
   }
 });
