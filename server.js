@@ -691,6 +691,7 @@ app.get('/admin/student-details', async (req, res) => {
     }
 
     const studentData = {
+      _id: student._id.toString(), // Add _id as a string
       enrollmentId: student.enrollmentId,
       rollNo: student.rollNo,
       fullName: student.fullName,
