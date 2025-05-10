@@ -1,7 +1,7 @@
 const express = require('express');
 const jwt = require('jsonwebtoken');
 const nodemailer = require('nodemailer');
-const { MongoClient } = require('mongodb');
+const { MongoClient, ObjectId } = require('mongodb');
 const cors = require('cors');
 
 const app = express();
@@ -540,6 +540,8 @@ app.put('/admin/users/:id', async (req, res) => {
   const userId = req.params.id;
   const { enrollmentId, rollNo, fullName, yearOfStudy, division, email, role } = req.body;
   console.log('Received /admin/users PUT request:', { userId, enrollmentId, rollNo, fullName, yearOfStudy, division, email, role });
+
+  // Check authorization header
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     console.error('Missing or invalid authorization header for /admin/users PUT');
     return res.status(401).json({ error: 'Unauthorized' });
@@ -547,36 +549,61 @@ app.put('/admin/users/:id', async (req, res) => {
 
   const token = authHeader.split(' ')[1];
   try {
+    // Verify JWT token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     if (decoded.role !== 'Admin') {
       console.log('Unauthorized role for /admin/users PUT:', decoded.role);
       return res.status(403).json({ error: 'Unauthorized role' });
     }
 
+    // Validate userId format
+    let objectId;
+    try {
+      objectId = new ObjectId(userId);
+    } catch (idError) {
+      console.error('Invalid userId format:', userId, idError.message);
+      return res.status(400).json({ error: 'Invalid user ID format' });
+    }
+
+    // Build update data
     const updateData = {};
-    if (enrollmentId) updateData.enrollmentId = enrollmentId;
-    if (rollNo) updateData.rollNo = rollNo;
-    if (fullName) updateData.fullName = fullName;
-    if (yearOfStudy) updateData.yearOfStudy = yearOfStudy;
-    if (division) updateData.division = division;
-    if (email) updateData.email = email;
+    if (enrollmentId !== undefined) updateData.enrollmentId = enrollmentId;
+    if (rollNo !== undefined) updateData.rollNo = rollNo;
+    if (fullName !== undefined) updateData.fullName = fullName;
+    if (yearOfStudy !== undefined) updateData.yearOfStudy = yearOfStudy;
+    if (division !== undefined) updateData.division = division;
+    if (email) updateData.email = email; // Email must be provided to update
     if (role) updateData.role = role;
 
+    // Check if there's anything to update
+    if (Object.keys(updateData).length === 0) {
+      console.log('No fields provided to update for userId:', userId);
+      return res.status(400).json({ error: 'No fields provided to update' });
+    }
+
+    console.log('Update data:', updateData);
+
+    // Perform the update
     const result = await usersCollection.updateOne(
-      { _id: new client.ObjectId(userId) },
+      { _id: objectId },
       { $set: updateData }
     );
+
     if (result.matchedCount === 0) {
       console.log('User not found for update:', userId);
       return res.status(404).json({ error: 'User not found' });
     }
 
     console.log('User updated by Admin:', userId);
-    const updatedUser = await usersCollection.findOne({ _id: new client.ObjectId(userId) });
+    const updatedUser = await usersCollection.findOne({ _id: objectId });
     res.json(updatedUser);
   } catch (error) {
+    if (error.name === 'JsonWebTokenError') {
+      console.error('JWT verification failed:', error.message);
+      return res.status(401).json({ error: 'Invalid token' });
+    }
     console.error('Error in /admin/users PUT:', error.message);
-    res.status(500).json({ error: 'Failed to update user' });
+    res.status(500).json({ error: 'Failed to update user', details: error.message });
   }
 });
 
@@ -598,7 +625,7 @@ app.delete('/admin/users/:id', async (req, res) => {
       return res.status(403).json({ error: 'Unauthorized role' });
     }
 
-    const result = await usersCollection.deleteOne({ _id: new client.ObjectId(userId) });
+    const result = await usersCollection.deleteOne({ _id: new ObjectId(userId) });
     if (result.deletedCount === 0) {
       console.log('User not found for deletion:', userId);
       return res.status(404).json({ error: 'User not found' });
