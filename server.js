@@ -534,6 +534,180 @@ app.get('/admin/users', async (req, res) => {
   }
 });
 
+// Admin: Fetch users by role
+app.get('/admin/users-by-role', async (req, res) => {
+  const authHeader = req.headers.authorization;
+  const { role } = req.query;
+  console.log('Received /admin/users-by-role request:', { role });
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    console.error('Missing or invalid authorization header for /admin/users-by-role');
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  if (!role) {
+    console.error('Missing role parameter');
+    return res.status(400).json({ error: 'Role parameter required' });
+  }
+  if (!['Admin', 'Faculty', 'Student'].includes(role)) {
+    console.error('Invalid role parameter:', role);
+    return res.status(400).json({ error: 'Invalid role' });
+  }
+
+  const token = authHeader.split(' ')[1];
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    if (decoded.role !== 'Admin') {
+      console.log('Unauthorized role for /admin/users-by-role:', decoded.role);
+      return res.status(403).json({ error: 'Unauthorized role' });
+    }
+
+    const users = await usersCollection.find({ role }).toArray();
+    console.log(`Users fetched for role ${role} by Admin:`, decoded.email);
+    res.json(users);
+  } catch (error) {
+    console.error('Error in /admin/users-by-role:', error.message);
+    res.status(401).json({ error: 'Invalid token' });
+  }
+});
+
+// Admin: Fetch years of study for students
+app.get('/admin/student-years', async (req, res) => {
+  const authHeader = req.headers.authorization;
+  console.log('Received /admin/student-years request');
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    console.error('Missing or invalid authorization header for /admin/student-years');
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
+  const token = authHeader.split(' ')[1];
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    if (decoded.role !== 'Admin') {
+      console.log('Unauthorized role for /admin/student-years:', decoded.role);
+      return res.status(403).json({ error: 'Unauthorized role' });
+    }
+
+    // Hardcode the years as requested: 1st Year, 2nd Year, 3rd Year, 4th Year
+    const years = ['First', 'Second', 'Third', 'Fourth'];
+    console.log('Years fetched for Admin:', years);
+    res.json(years);
+  } catch (error) {
+    console.error('Error in /admin/student-years:', error.message);
+    res.status(401).json({ error: 'Invalid token' });
+  }
+});
+
+// Admin: Fetch divisions for a given year
+app.get('/admin/student-divisions', async (req, res) => {
+  const authHeader = req.headers.authorization;
+  const { year } = req.query;
+  console.log('Received /admin/student-divisions request:', { year });
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    console.error('Missing or invalid authorization header for /admin/student-divisions');
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  if (!year) {
+    console.error('Missing year parameter');
+    return res.status(400).json({ error: 'Year parameter required' });
+  }
+
+  const token = authHeader.split(' ')[1];
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    if (decoded.role !== 'Admin') {
+      console.log('Unauthorized role for /admin/student-divisions:', decoded.role);
+      return res.status(403).json({ error: 'Unauthorized role' });
+    }
+
+    const divisions = await usersCollection.distinct('division', { role: 'Student', yearOfStudy: year });
+    console.log('Divisions fetched for Admin:', divisions);
+    res.json(divisions);
+  } catch (error) {
+    console.error('Error in /admin/student-divisions:', error.message);
+    res.status(401).json({ error: 'Invalid token' });
+  }
+});
+
+// Admin: Fetch roll numbers for a given year and division
+app.get('/admin/student-roll-nos', async (req, res) => {
+  const authHeader = req.headers.authorization;
+  const { year, division } = req.query;
+  console.log('Received /admin/student-roll-nos request:', { year, division });
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    console.error('Missing or invalid authorization header for /admin/student-roll-nos');
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  if (!year || !division) {
+    console.error('Missing year or division parameter');
+    return res.status(400).json({ error: 'Year and division parameters required' });
+  }
+
+  const token = authHeader.split(' ')[1];
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    if (decoded.role !== 'Admin') {
+      console.log('Unauthorized role for /admin/student-roll-nos:', decoded.role);
+      return res.status(403).json({ error: 'Unauthorized role' });
+    }
+
+    const students = await usersCollection.find({ role: 'Student', yearOfStudy: year, division }).toArray();
+    const rollNos = students.map(student => ({
+      rollNo: student.rollNo,
+      email: student.email, // Include email to fetch details later
+    }));
+    console.log('Roll numbers fetched for Admin:', rollNos);
+    res.json(rollNos);
+  } catch (error) {
+    console.error('Error in /admin/student-roll-nos:', error.message);
+    res.status(401).json({ error: 'Invalid token' });
+  }
+});
+
+// Admin: Fetch details for a specific student (without marks)
+app.get('/admin/student-details', async (req, res) => {
+  const authHeader = req.headers.authorization;
+  const { email } = req.query;
+  console.log('Received /admin/student-details request:', { email });
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    console.error('Missing or invalid authorization header for /admin/student-details');
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+  if (!email) {
+    console.error('Missing email parameter');
+    return res.status(400).json({ error: 'Email parameter required' });
+  }
+
+  const token = authHeader.split(' ')[1];
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    if (decoded.role !== 'Admin') {
+      console.log('Unauthorized role for /admin/student-details:', decoded.role);
+      return res.status(403).json({ error: 'Unauthorized role' });
+    }
+
+    const student = await usersCollection.findOne({ email, role: 'Student' });
+    if (!student) {
+      console.log('Student not found for /admin/student-details:', email);
+      return res.status(404).json({ error: 'Student not found' });
+    }
+
+    const studentData = {
+      enrollmentId: student.enrollmentId,
+      rollNo: student.rollNo,
+      fullName: student.fullName,
+      yearOfStudy: student.yearOfStudy,
+      division: student.division,
+      email: student.email,
+      role: student.role,
+    };
+
+    console.log('Student details fetched for Admin:', email);
+    res.json(studentData);
+  } catch (error) {
+    console.error('Error in /admin/student-details:', error.message);
+    res.status(401).json({ error: 'Invalid token' });
+  }
+});
+
 // Admin: Update user
 app.put('/admin/users/:id', async (req, res) => {
   const authHeader = req.headers.authorization;
@@ -541,7 +715,6 @@ app.put('/admin/users/:id', async (req, res) => {
   const { enrollmentId, rollNo, fullName, yearOfStudy, division, email, role } = req.body;
   console.log('Received /admin/users PUT request:', { userId, enrollmentId, rollNo, fullName, yearOfStudy, division, email, role });
 
-  // Check authorization header
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     console.error('Missing or invalid authorization header for /admin/users PUT');
     return res.status(401).json({ error: 'Unauthorized' });
@@ -549,14 +722,12 @@ app.put('/admin/users/:id', async (req, res) => {
 
   const token = authHeader.split(' ')[1];
   try {
-    // Verify JWT token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
     if (decoded.role !== 'Admin') {
       console.log('Unauthorized role for /admin/users PUT:', decoded.role);
       return res.status(403).json({ error: 'Unauthorized role' });
     }
 
-    // Validate userId format
     let objectId;
     try {
       objectId = new ObjectId(userId);
@@ -565,17 +736,15 @@ app.put('/admin/users/:id', async (req, res) => {
       return res.status(400).json({ error: 'Invalid user ID format' });
     }
 
-    // Build update data
     const updateData = {};
     if (enrollmentId !== undefined) updateData.enrollmentId = enrollmentId;
     if (rollNo !== undefined) updateData.rollNo = rollNo;
     if (fullName !== undefined) updateData.fullName = fullName;
     if (yearOfStudy !== undefined) updateData.yearOfStudy = yearOfStudy;
     if (division !== undefined) updateData.division = division;
-    if (email) updateData.email = email; // Email must be provided to update
+    if (email) updateData.email = email;
     if (role) updateData.role = role;
 
-    // Check if there's anything to update
     if (Object.keys(updateData).length === 0) {
       console.log('No fields provided to update for userId:', userId);
       return res.status(400).json({ error: 'No fields provided to update' });
@@ -583,7 +752,6 @@ app.put('/admin/users/:id', async (req, res) => {
 
     console.log('Update data:', updateData);
 
-    // Perform the update
     const result = await usersCollection.updateOne(
       { _id: objectId },
       { $set: updateData }
