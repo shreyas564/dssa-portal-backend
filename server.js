@@ -398,12 +398,8 @@ app.get('/faculty/years', async (req, res) => {
 // Faculty: Fetch unique divisions for a given year
 app.get('/faculty/divisions', async (req, res) => {
   const authHeader = req.headers.authorization;
-  let { year } = req.query;
-  console.log('Received /faculty/divisions request:', {
-    year,
-    authHeader: authHeader ? authHeader.substring(0, 20) + '...' : 'Missing'
-  });
-
+  const { year } = req.query;
+  console.log('Received /faculty/divisions request:', { year });
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     console.error('Missing or invalid authorization header for /faculty/divisions');
     return res.status(401).json({ error: 'Unauthorized' });
@@ -415,43 +411,18 @@ app.get('/faculty/divisions', async (req, res) => {
 
   const token = authHeader.split(' ')[1];
   try {
-    // Verify JWT token
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    console.log('JWT decoded:', { email: decoded.email, role: decoded.role });
-
     if (decoded.role !== 'Faculty') {
       console.log('Unauthorized role for /faculty/divisions:', decoded.role);
       return res.status(403).json({ error: 'Unauthorized role' });
     }
 
-    // Normalize year: Remove spaces (e.g., "Third Year" -> "ThirdYear")
-    year = year.replace(/\s/g, '');
-    console.log('Normalized year:', year);
-
-    // Log the query being executed
-    console.log('Querying users collection for:', { role: 'Student', yearOfStudy: year });
-
-    // Query distinct divisions for the given year
     const divisions = await usersCollection.distinct('division', { role: 'Student', yearOfStudy: year });
-    console.log('Divisions fetched for year:', year, divisions);
-
-    if (!divisions || divisions.length === 0) {
-      console.log('No divisions found for year:', year);
-      return res.status(404).json({ error: 'No divisions found for this year' });
-    }
-
-    // Sort divisions alphabetically
-    divisions.sort();
+    console.log('Divisions fetched for Faculty:', divisions);
     res.json(divisions);
   } catch (error) {
-    console.error('Error in /faculty/divisions:', {
-      message: error.message,
-      stack: error.stack
-    });
-    if (error.name === 'JsonWebTokenError') {
-      return res.status(401).json({ error: 'Invalid token' });
-    }
-    res.status(500).json({ error: 'Failed to fetch divisions' });
+    console.error('Error in /faculty/divisions:', error.message);
+    res.status(401).json({ error: 'Invalid token' });
   }
 });
 
