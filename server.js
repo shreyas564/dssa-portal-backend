@@ -396,9 +396,10 @@ app.get('/faculty/years', async (req, res) => {
 });
 
 // Faculty: Fetch unique divisions for a given year
+// Faculty: Fetch unique divisions for a given year
 app.get('/faculty/divisions', async (req, res) => {
   const authHeader = req.headers.authorization;
-  const { year } = req.query;
+  let { year } = req.query;
   console.log('Received /faculty/divisions request:', { year });
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     console.error('Missing or invalid authorization header for /faculty/divisions');
@@ -417,12 +418,25 @@ app.get('/faculty/divisions', async (req, res) => {
       return res.status(403).json({ error: 'Unauthorized role' });
     }
 
+    // Normalize year: Remove spaces (e.g., "Third Year" -> "ThirdYear")
+    year = year.replace(/\s/g, '');
+    console.log('Normalized year:', year);
+
+    // Query distinct divisions for the given year
     const divisions = await usersCollection.distinct('division', { role: 'Student', yearOfStudy: year });
-    console.log('Divisions fetched for Faculty:', divisions);
+    console.log('Divisions fetched for year:', year, divisions);
+
+    if (!divisions || divisions.length === 0) {
+      console.log('No divisions found for year:', year);
+      return res.status(404).json({ error: 'No divisions found for this year' });
+    }
+
+    // Sort divisions alphabetically
+    divisions.sort();
     res.json(divisions);
   } catch (error) {
     console.error('Error in /faculty/divisions:', error.message);
-    res.status(401).json({ error: 'Invalid token' });
+    res.status(500).json({ error: 'Failed to fetch divisions' });
   }
 });
 
